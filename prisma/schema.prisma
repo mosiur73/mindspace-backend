@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  THERAPIST
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  PRO
+  PREMIUM
+}
+
+enum SessionType {
+  ONLINE
+  IN_PERSON
+}
+
+enum SessionStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// ─── Models ────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String?
+  role          Role      @default(USER)
+  avatar        String?
+  phone         String?
+  dateOfBirth   DateTime?
+  bio           String?
+  plan          Plan      @default(FREE)
+  isActive      Boolean   @default(true)
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  therapist     Therapist?
+  sessions      Session[]      @relation("UserSessions")
+  journals      Journal[]
+  moodLogs      MoodLog[]
+  reviews       Review[]
+  subscription  Subscription?
+  notifications Notification[]
+  accounts      Account[]
+  chatMessages  ChatMessage[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Therapist {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  specialty      String[]
+  bio            String?
+  approach       String?
+  price          Float    @default(0)
+  sessionTypes   String[]
+  languages      String[]
+  education      Json?
+  certifications String[]
+  experience     Int      @default(0)
+  rating         Float    @default(0)
+  totalReviews   Int      @default(0)
+  verified       Boolean  @default(false)
+  available      Boolean  @default(true)
+  availability   Json?
+  images         String[]
+  introVideo     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions     Session[]                @relation("TherapistSessions")
+  reviews      Review[]
+  earnings     Earning[]
+  availabilities TherapistAvailability[]
+
+  @@map("therapists")
+}
+
+model Session {
+  id           String        @id @default(cuid())
+  userId       String
+  therapistId  String
+  date         DateTime
+  duration     Int           @default(50)
+  type         SessionType   @default(ONLINE)
+  status       SessionStatus @default(PENDING)
+  notes        String?
+  cancelReason String?
+  amount       Float
+  reminderSent Boolean @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  user      User      @relation("UserSessions", fields: [userId], references: [id])
+  therapist Therapist @relation("TherapistSessions", fields: [therapistId], references: [id])
+
+  @@map("sessions")
+}
+
+model Journal {
+  id         String   @id @default(cuid())
+  userId     String
+  content    String
+  moodScore  Int      @default(5)
+  aiAnalysis Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("journals")
+}
+
+model MoodLog {
+  id        String   @id @default(cuid())
+  userId    String
+  score     Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mood_logs")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  userId      String
+  therapistId String
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  therapist Therapist @relation(fields: [therapistId], references: [id])
+
+  @@unique([userId, therapistId])
+  @@map("reviews")
+}
+
+model Subscription {
+  id            String             @id @default(cuid())
+  userId        String             @unique
+  plan          Plan
+  startDate     DateTime
+  endDate       DateTime
+  status        SubscriptionStatus @default(ACTIVE)
+  amount        Float
+  transactionId String?            @unique
+  paymentMethod String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model Blog {
+  id         String     @id @default(cuid())
+  title      String
+  content    String
+  excerpt    String?
+  authorId   String
+  category   String
+  tags       String[]
+  coverImage String?
+  status     BlogStatus @default(DRAFT)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@map("blogs")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model TherapistAvailability {
+  id           String    @id @default(cuid())
+  therapistId  String
+  dayOfWeek    Int       // 0=Sun 1=Mon … 6=Sat
+  startTime    String    // "09:00"
+  endTime      String    // "17:00"
+  slotDuration Int       @default(50)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  therapist Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@unique([therapistId, dayOfWeek])
+  @@map("therapist_availability")
+}
+
+model Newsletter {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("newsletters")
+}
+
+model Earning {
+  id          String   @id @default(cuid())
+  therapistId String
+  sessionId   String?
+  amount      Float
+  type        String   @default("session")
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+
+  therapist Therapist @relation(fields: [therapistId], references: [id])
+
+  @@map("earnings")
+}
