@@ -88,8 +88,8 @@
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/your-username/mindspace.git
-cd mindspace
+git https://github.com/mosiur73/mindspace-backend
+cd mindspace-backend
 ```
 
 ---
